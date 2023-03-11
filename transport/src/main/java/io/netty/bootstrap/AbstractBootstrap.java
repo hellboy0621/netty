@@ -106,6 +106,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * {@link Channel} implementation has no no-args constructor.
      */
     public B channel(Class<? extends C> channelClass) {
+        // 这里 channelFactory 被创建出来
+        // bootstrap.channel(NioServerSocketChannel.class)
         return channelFactory(new ReflectiveChannelFactory<C>(
                 ObjectUtil.checkNotNull(channelClass, "channelClass")
         ));
@@ -243,6 +245,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(int inetPort) {
+        // 绑定端口号，启动时分析入口
         return bind(new InetSocketAddress(inetPort));
     }
 
@@ -264,11 +267,13 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
+        // 验证服务启动需要的必要参数
         validate();
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        // 核心方法 initAndRegister，从名字上推测是初始化并且注册到 Selector 上
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
@@ -278,6 +283,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
+            // 核心方法 doBind0，4. 绑定服务端端口
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
         } else {
@@ -307,7 +313,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            // 1. 创建服务端 channel
+            // io.netty.bootstrap.AbstractBootstrap.channelFactory(io.netty.bootstrap.ChannelFactory<? extends C>)
+            // io.netty.channel.ReflectiveChannelFactory.newChannel
+            // NioServerSocketChannel 无参构造方法
             channel = channelFactory.newChannel();
+            // 2. 初始化服务端 channel
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -320,6 +331,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 3. 注册服务端 channel
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
