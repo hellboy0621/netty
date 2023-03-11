@@ -77,10 +77,13 @@ public final class ChannelOutboundBuffer {
     // Entry(flushedEntry) --> ... Entry(unflushedEntry) --> ... Entry(tailEntry)
     //
     // The Entry that is the first in the linked-list structure that was flushed
+    // 表示第一个被写入操作系统 Socket 缓冲区的节点
     private Entry flushedEntry;
     // The Entry which is the first unflushed in the linked-list structure
+    // 表示第一个未被写入操作系统 Socket 缓冲区的节点
     private Entry unflushedEntry;
     // The Entry which represents the tail of the buffer
+    // 表示 ChannelOutboundBuffer 缓冲区的最后一个节点
     private Entry tailEntry;
     // The number of flushed entries that are not written yet
     private int flushed;
@@ -113,6 +116,7 @@ public final class ChannelOutboundBuffer {
      * the message was written.
      */
     public void addMessage(Object msg, int size, ChannelPromise promise) {
+        // 创建一个待写出的消息节点
         Entry entry = Entry.newInstance(msg, size, total(msg), promise);
         if (tailEntry == null) {
             flushedEntry = null;
@@ -274,16 +278,19 @@ public final class ChannelOutboundBuffer {
         ChannelPromise promise = e.promise;
         int size = e.pendingSize;
 
+        // 移除该节点
         removeEntry(e);
 
         if (!e.cancelled) {
             // only release message, notify and decrement if it was not canceled before.
             ReferenceCountUtil.safeRelease(msg);
+            // 回调
             safeSuccess(promise);
             decrementPendingOutboundBytes(size, false, true);
         }
 
         // recycle the entry
+        // 回收实体
         e.unguardedRecycle();
 
         return true;

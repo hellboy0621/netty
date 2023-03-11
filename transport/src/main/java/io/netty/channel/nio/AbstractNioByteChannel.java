@@ -214,12 +214,14 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
     private int doWriteInternal(ChannelOutboundBuffer in, Object msg) throws Exception {
         if (msg instanceof ByteBuf) {
+            // 强转为 ByteBuf，若发现没有数据可读，则直接删除该节点
             ByteBuf buf = (ByteBuf) msg;
             if (!buf.isReadable()) {
                 in.remove();
                 return 0;
             }
 
+            // io.netty.channel.socket.nio.NioSocketChannel.doWriteBytes
             final int localFlushedAmount = doWriteBytes(buf);
             if (localFlushedAmount > 0) {
                 in.progress(localFlushedAmount);
@@ -252,8 +254,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+        // 获得自旋锁的迭代次数
         int writeSpinCount = config().getWriteSpinCount();
         do {
+            // 获得第一个需要 flush 的节点数据
             Object msg = in.current();
             if (msg == null) {
                 // Wrote all messages.
