@@ -573,6 +573,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             boolean wasActive = isActive();
             try {
+                // 1. 调用 JDK 底层绑定端口
+                // io.netty.channel.socket.nio.NioServerSocketChannel.doBind
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
@@ -584,6 +586,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
+                        // 2. 传播 channelActive 事件
+                        // io.netty.channel.DefaultChannelPipeline.fireChannelActive
                         pipeline.fireChannelActive();
                     }
                 });
@@ -845,6 +849,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             assertEventLoop();
 
             try {
+                // io.netty.channel.nio.AbstractNioChannel.doBeginRead
                 doBeginRead();
             } catch (final Exception e) {
                 invokeLater(new Runnable() {

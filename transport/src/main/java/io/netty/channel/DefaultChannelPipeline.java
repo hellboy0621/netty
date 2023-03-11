@@ -1331,6 +1331,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         @Override
         public void bind(
                 ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) {
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.bind
             unsafe.bind(localAddress, promise);
         }
 
@@ -1359,6 +1360,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void read(ChannelHandlerContext ctx) {
+            // 从 Head 开始读
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.beginRead
             unsafe.beginRead();
         }
 
@@ -1400,8 +1403,10 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) {
+            // 传播 channelActive 到用户代码中
             ctx.fireChannelActive();
 
+            // 注册 ACCEPT 事件
             readIfIsAutoRead();
         }
 
@@ -1423,7 +1428,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         }
 
         private void readIfIsAutoRead() {
+            // 默认返回 true
             if (channel.config().isAutoRead()) {
+                // io.netty.channel.AbstractChannel.read
                 channel.read();
             }
         }
