@@ -77,10 +77,14 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * @param readInterestOp    the ops to set to receive data from the {@link SelectableChannel}
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
+        // parent 为 null
         super(parent);
+        // 把刚才创建的 channel 保存到成员变量 ch 中
         this.ch = ch;
+        // 这里传入的是 OP_ACCEPT 事件，处理新连接的接入
         this.readInterestOp = readInterestOp;
         try {
+            // 设置该 channel 为非阻塞模式
             ch.configureBlocking(false);
         } catch (IOException e) {
             try {
@@ -377,6 +381,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         boolean selected = false;
         for (;;) {
             try {
+                // 拿到前面创建的 JDK 的 channel，调用 register 注册方法
+                // 将 this AbstractNioChannel 对象当做 attachment 绑定到 JDK 的 Selector 上；
+                // 后续从 Selector 拿到对应的事件之后，就可以把 Netty 领域的 Channel 拿出来；
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -402,6 +409,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     @Override
     protected void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called
+        // 注册时 ops 是 0，即不关注任何事件，只是建立绑定关系 io.netty.channel.nio.AbstractNioChannel.doRegister
         final SelectionKey selectionKey = this.selectionKey;
         if (!selectionKey.isValid()) {
             return;
@@ -411,6 +419,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         final int interestOps = selectionKey.interestOps();
         if ((interestOps & readInterestOp) == 0) {
+            // 将 ACCEPT 事件注册到 Selector 上
             selectionKey.interestOps(interestOps | readInterestOp);
         }
     }
