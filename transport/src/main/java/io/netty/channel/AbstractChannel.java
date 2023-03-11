@@ -478,15 +478,18 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 绑定事件循环器
             AbstractChannel.this.eventLoop = eventLoop;
 
             if (eventLoop.inEventLoop()) {
+                // 注册 Selector
                 register0(promise);
             } else {
                 try {
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {
+                            // 注册 Selector
                             register0(promise);
                         }
                     });
@@ -509,18 +512,25 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                // 1. 调用 JDK 底层注册 Selector
+                // io.netty.channel.nio.AbstractNioChannel.doRegister
                 doRegister();
                 neverRegistered = false;
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                // 2. 回调 handlerAdded 事件，通过 Pipeline 传播
                 pipeline.invokeHandlerAddedIfNeeded();
 
                 safeSetSuccess(promise);
+                // 3. 传播 channelRegistered 事件，通过 Pipeline HeadContext 传播
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
+                // 4. 其他逻辑
+                // io.netty.channel.socket.nio.NioServerSocketChannel.isActive
+                // 此时还没有将1个 ServerSocket 绑定到一个 address 上，所以 isActive() 返回 false，不会执行 pipeline.fireChannelActive();
                 if (isActive()) {
                     if (firstRegistration) {
                         pipeline.fireChannelActive();
