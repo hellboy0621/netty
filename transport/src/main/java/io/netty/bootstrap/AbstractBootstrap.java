@@ -332,6 +332,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
 
         // 3. 注册服务端 channel
+        // io.netty.channel.MultithreadEventLoopGroup.register(io.netty.channel.Channel)
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {

@@ -83,6 +83,8 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
 
     @Override
     public ChannelFuture register(Channel channel) {
+        // 通过选择器，选择一个 NioEventLoop，可以追溯到 boss = NioEventLoopGroup()
+        // io.netty.channel.SingleThreadEventLoop.register(io.netty.channel.Channel)
         return next().register(channel);
     }
 
