@@ -1364,11 +1364,16 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+            // 最终，往客户端写数据，会到达这里
+            // 这里的 msg 就是载有 Java 对象数据的自定义 ByteBuf 对象
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.write
             unsafe.write(msg, promise);
         }
 
         @Override
         public void flush(ChannelHandlerContext ctx) {
+            // 不管调用 channel.flush() 还是调用 ctx.flush()，最终都会落地到 Head 节点
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.flush
             unsafe.flush();
         }
 

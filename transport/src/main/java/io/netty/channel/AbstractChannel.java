@@ -845,6 +845,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void write(Object msg, ChannelPromise promise) {
+            // 确保该方法的调用在 Reactor 线程中
             assertEventLoop();
 
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
@@ -865,7 +866,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             int size;
             try {
+                // 将待写入的对象过滤，把非 ByteBuf 对象和 FileRegion 过滤，把所有的非直接内存转换成直接内存 DirectBuffer
+                // io.netty.channel.nio.AbstractNioByteChannel.filterOutboundMessage
                 msg = filterOutboundMessage(msg);
+                // 估算出需要写入的 ByteBuf 的 size
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;
@@ -928,6 +932,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+                // io.netty.channel.nio.AbstractNioByteChannel.doWrite
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
                 handleWriteError(t);
