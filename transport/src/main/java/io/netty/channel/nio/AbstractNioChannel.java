@@ -409,6 +409,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     @Override
     protected void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called
+        // 注册时 ops 是 0，即不关注任何事件，只是建立绑定关系 io.netty.channel.nio.AbstractNioChannel.doRegister
         final SelectionKey selectionKey = this.selectionKey;
         if (!selectionKey.isValid()) {
             return;
@@ -418,6 +419,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         final int interestOps = selectionKey.interestOps();
         if ((interestOps & readInterestOp) == 0) {
+            // 将 ACCEPT 事件注册到 Selector 上
             selectionKey.interestOps(interestOps | readInterestOp);
         }
     }

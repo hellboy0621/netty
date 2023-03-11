@@ -331,6 +331,7 @@ public class DefaultChannelConfig implements ChannelConfig {
 
     @Override
     public boolean isAutoRead() {
+        // 默认返回 true
         return autoRead == 1;
     }
 
