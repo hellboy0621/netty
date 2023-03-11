@@ -30,6 +30,7 @@ import java.net.SocketAddress;
 /**
  * A nexus to a network socket or a component which is capable of I/O
  * operations such as read, write, connect, and bind.
+ * Channel 可以理解为一个网络连接，或者具有 I/O 操作能力（读、写、连接、绑定）的组件。
  * <p>
  * A channel provides a user:
  * <ul>
