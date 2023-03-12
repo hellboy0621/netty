@@ -57,6 +57,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
      */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor, Object... args) {
+        // 第3个参数，线程选择器工厂类实例
         this(nThreads, executor, DefaultEventExecutorChooserFactory.INSTANCE, args);
     }
 
@@ -72,15 +73,20 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
                                             EventExecutorChooserFactory chooserFactory, Object... args) {
         checkPositive(nThreads, "nThreads");
 
+        // 1. 创建 ThreadPerTaskExecutor
         if (executor == null) {
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
+        // 2. 创建 NioEventLoop
+        // 关键3点：1.创建NioEventLoop；2.创建Selector；3.创建MPSC队列
         children = new EventExecutor[nThreads];
 
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                // 1个 NioEventLoop 对应一个线程实体，即 FastThreadLocalThread
+                // io.netty.channel.nio.NioEventLoopGroup.newChild
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
@@ -108,6 +114,8 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        // 3. 创建线程选择器
+        // io.netty.util.concurrent.DefaultEventExecutorChooserFactory.newChooser
         chooser = chooserFactory.newChooser(children);
 
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
@@ -129,6 +137,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     }
 
     protected ThreadFactory newDefaultThreadFactory() {
+        // 这里的 getClass() 调用的对象是 NioEventLoopGroup，通过其构造方法一步步调用至此
         return new DefaultThreadFactory(getClass());
     }
 

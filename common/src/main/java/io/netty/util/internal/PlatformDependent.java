@@ -1037,6 +1037,8 @@ public final class PlatformDependent {
      * @return A MPSC queue which may be unbounded.
      */
     public static <T> Queue<T> newMpscQueue() {
+        // 新建 MPSC 队列，多生产者单消费者队列
+        // 底层对应 jctools 工具包
         return Mpsc.newMpscQueue();
     }
 

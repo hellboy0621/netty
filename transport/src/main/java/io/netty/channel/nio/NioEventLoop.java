@@ -139,10 +139,12 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory taskQueueFactory, EventLoopTaskQueueFactory tailTaskQueueFactory) {
+        // 调用父类构造方法，newTaskQueue 关键方法
         super(parent, executor, false, newTaskQueue(taskQueueFactory), newTaskQueue(tailTaskQueueFactory),
                 rejectedExecutionHandler);
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
+        // 创建 Selector，负责监听多个连接的读写事件，多路复用
         final SelectorTuple selectorTuple = openSelector();
         this.selector = selectorTuple.selector;
         this.unwrappedSelector = selectorTuple.unwrappedSelector;
@@ -150,6 +152,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static Queue<Runnable> newTaskQueue(
             EventLoopTaskQueueFactory queueFactory) {
+        // EventLoopTaskQueueFactory 作为扩展点，默认为 null
         if (queueFactory == null) {
             return newTaskQueue0(DEFAULT_MAX_PENDING_TASKS);
         }
@@ -280,6 +283,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static Queue<Runnable> newTaskQueue0(int maxPendingTasks) {
         // This event loop never calls takeTask()
+        // maxPendingTasks 默认为 Integer.MAX_VALUE
         return maxPendingTasks == Integer.MAX_VALUE ? PlatformDependent.<Runnable>newMpscQueue()
                 : PlatformDependent.<Runnable>newMpscQueue(maxPendingTasks);
     }
