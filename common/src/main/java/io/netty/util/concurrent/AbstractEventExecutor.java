@@ -63,6 +63,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     @Override
     public boolean inEventLoop() {
+        // io.netty.util.concurrent.SingleThreadEventExecutor.inEventLoop
         return inEventLoop(Thread.currentThread());
     }
 

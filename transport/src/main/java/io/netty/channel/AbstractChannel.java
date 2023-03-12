@@ -481,11 +481,15 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             // 绑定事件循环器
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // NioEventLoop 启动入口
+            // 启动时，调用此处的线程为 main 线程，inEventLoop() 会返回false
+            // io.netty.util.concurrent.AbstractEventExecutor.inEventLoop
             if (eventLoop.inEventLoop()) {
                 // 注册 Selector
                 register0(promise);
             } else {
                 try {
+                    // io.netty.util.concurrent.SingleThreadEventExecutor.execute(java.lang.Runnable)
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {
