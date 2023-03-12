@@ -168,6 +168,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         super(parent);
         this.addTaskWakesUp = addTaskWakesUp;
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
+        // executor = new ThreadPerTaskExecutor()
         this.executor = ThreadExecutorMap.apply(executor, this);
         // 创建任务队列，Netty 中所有的异步执行，本质上都是通过这个任务队列来协调完成的
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
@@ -559,6 +560,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     @Override
     public boolean inEventLoop(Thread thread) {
+        // 传入当前线程 main，this.thread 还未赋值，为 null，所以启动时返回 false
+        // 后面在创建线程后，会将线程实体保存到 this.thread 中，io.netty.util.concurrent.SingleThreadEventExecutor.doStartThread 1000行 thread = Thread.currentThread();
         return thread == this.thread;
     }
 
@@ -833,9 +836,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 之所以增加外部线程判断，是为了确保线程安全
+        // 用户代码中经常会使用 ctx.executor().execute(...);
         boolean inEventLoop = inEventLoop();
         addTask(task);
         if (!inEventLoop) {
+            // 开启线程
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -949,10 +955,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final long SCHEDULE_PURGE_INTERVAL = TimeUnit.SECONDS.toNanos(1);
 
     private void startThread() {
+        // 判断线程是否被启动
         if (state == ST_NOT_STARTED) {
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {
+                    // 启动线程
                     doStartThread();
                     success = true;
                 } finally {
@@ -984,9 +992,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+        // 这里的 executor 就是 ThreadPerTaskExecutor，每次调用 execute 时，创建新的 FastThreadLocalThread
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                // 使用成员变量 thread 保存 FastThreadLocalThread
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();
@@ -995,6 +1005,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // Netty Reactor 核心所在
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {
