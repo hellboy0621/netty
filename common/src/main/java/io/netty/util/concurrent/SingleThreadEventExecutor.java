@@ -168,7 +168,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         super(parent);
         this.addTaskWakesUp = addTaskWakesUp;
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
+        // executor = new ThreadPerTaskExecutor()
         this.executor = ThreadExecutorMap.apply(executor, this);
+        // 创建任务队列，Netty 中所有的异步执行，本质上都是通过这个任务队列来协调完成的
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
         this.rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
     }
@@ -288,6 +290,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
             if (!taskQueue.offer(scheduledTask)) {
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
+                // 当 taskQueue offer 失败时，需要把从 scheduledTaskQueue 里取出来的任务重新添加回去
                 scheduledTaskQueue.add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
             }
@@ -456,6 +459,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
     protected boolean runAllTasks(long timeoutNanos) {
+        // 1. 转移定时任务至 MPSC Queue
         fetchFromScheduledTaskQueue();
         Runnable task = pollTask();
         if (task == null) {
@@ -463,14 +467,20 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             return false;
         }
 
+        // 2. 计算本轮任务执行的截止时间
         final long deadline = timeoutNanos > 0 ? getCurrentTimeNanos() + timeoutNanos : 0;
         long runTasks = 0;
         long lastExecutionTime;
+        // 3. 执行任务
         for (;;) {
+            // 不抛异常，执行任务
             safeExecute(task);
 
+            // 累计当前已执行任务
             runTasks ++;
 
+            // 每隔 64 次，计算当前时间是否已过截止时间
+            // Netty 很多性能优化，用的都是 批量策略
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
             if ((runTasks & 0x3F) == 0) {
@@ -480,6 +490,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 }
             }
 
+            // 判断本轮任务是否执行完毕
             task = pollTask();
             if (task == null) {
                 lastExecutionTime = getCurrentTimeNanos();
@@ -558,6 +569,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     @Override
     public boolean inEventLoop(Thread thread) {
+        // 传入当前线程 main，this.thread 还未赋值，为 null，所以启动时返回 false
+        // 后面在创建线程后，会将线程实体保存到 this.thread 中，
+        // io.netty.util.concurrent.SingleThreadEventExecutor.doStartThread 1000行 thread = Thread.currentThread();
         return thread == this.thread;
     }
 
@@ -812,6 +826,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         return isTerminated();
     }
 
+    /**
+     * case 1: 用户自定义普通任务
+     * ctx.channel().eventloop().execute(() -> {
+     *     // ...
+     * });
+     * 最终会调用到这里
+     */
     @Override
     public void execute(Runnable task) {
         execute0(task);
@@ -832,9 +853,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 之所以增加外部线程判断，是为了确保线程安全
+        // 用户代码中经常会使用 ctx.executor().execute(...);
         boolean inEventLoop = inEventLoop();
         addTask(task);
         if (!inEventLoop) {
+            // 开启线程
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -853,7 +877,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
         }
 
+        // addTaskWakesUp 为 false
+        // 只要不是懒加载，immediate 就是 true
         if (!addTaskWakesUp && immediate) {
+            // 唤醒 selector.select()
             wakeup(inEventLoop);
         }
     }
@@ -948,10 +975,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final long SCHEDULE_PURGE_INTERVAL = TimeUnit.SECONDS.toNanos(1);
 
     private void startThread() {
+        // 判断线程是否被启动
         if (state == ST_NOT_STARTED) {
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {
+                    // 启动线程
                     doStartThread();
                     success = true;
                 } finally {
@@ -983,9 +1012,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+        // 这里的 executor 就是 ThreadPerTaskExecutor，每次调用 execute 时，创建新的 FastThreadLocalThread
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                // 使用成员变量 thread 保存 FastThreadLocalThread
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();
@@ -994,6 +1025,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // Netty Reactor 核心所在
+                    // Netty NioEventLoop 执行流程入口 io.netty.channel.nio.NioEventLoop.run
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

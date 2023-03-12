@@ -36,6 +36,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
                 }
             };
 
+    // 类被加载时的纳秒
     private static final long START_TIME = System.nanoTime();
 
     static final Runnable WAKEUP_TASK = new Runnable() {
@@ -77,6 +78,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
     }
 
     static long defaultCurrentTimeNanos() {
+        // 当前时间相对 AbstractScheduledEventExecutor 类加载的时间
         return System.nanoTime() - START_TIME;
     }
 
@@ -154,10 +156,12 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
     protected final Runnable pollScheduledTask(long nanoTime) {
         assert inEventLoop();
 
+        // peek 查询优先级队列头元素
         ScheduledFutureTask<?> scheduledTask = peekScheduledTask();
         if (scheduledTask == null || scheduledTask.deadlineNanos() - nanoTime > 0) {
             return null;
         }
+        // remove 移除优先级队列头元素
         scheduledTaskQueue.remove();
         scheduledTask.setConsumed();
         return scheduledTask;
@@ -176,11 +180,14 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
      * if no task is scheduled.
      */
     protected final long nextScheduledTaskDeadlineNanos() {
+        // 从优先级队列中获取第1个定时任务，定时任务是按照延迟时间从小到大进行排序的
+        // io.netty.util.concurrent.ScheduledFutureTask.compareTo
         ScheduledFutureTask<?> scheduledTask = peekScheduledTask();
         return scheduledTask != null ? scheduledTask.deadlineNanos() : -1;
     }
 
     final ScheduledFutureTask<?> peekScheduledTask() {
+        // 从优先级队列中取任务
         Queue<ScheduledFutureTask<?>> scheduledTaskQueue = this.scheduledTaskQueue;
         return scheduledTaskQueue != null ? scheduledTaskQueue.peek() : null;
     }
@@ -193,6 +200,12 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
         return scheduledTask != null && scheduledTask.deadlineNanos() <= getCurrentTimeNanos();
     }
 
+    /**
+     * case 3: 用户自定义定时任务
+     * ctx.channel().eventLoop().schedule(() -> {
+     *     // ...
+     * }, 60, TimeUnit.SECONDS);
+     */
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
         ObjectUtil.checkNotNull(command, "command");
@@ -202,6 +215,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
         }
         validateScheduled0(delay, unit);
 
+        // 将用户自定义任务再次包装成一个 Netty 内部的任务 ScheduledFutureTask
         return schedule(new ScheduledFutureTask<Void>(
                 this,
                 command,
@@ -282,6 +296,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
 
     private <V> ScheduledFuture<V> schedule(final ScheduledFutureTask<V> task) {
         if (inEventLoop()) {
+            // 如果是 Reactor 线程，则直接往优先级队列中添加任务
             scheduleFromEventLoop(task);
         } else {
             final long deadlineNanos = task.deadlineNanos();

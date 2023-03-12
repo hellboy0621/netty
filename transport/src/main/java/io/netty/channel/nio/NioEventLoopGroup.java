@@ -41,6 +41,8 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
      * Create a new instance using the default number of threads, the default {@link ThreadFactory} and
      * the {@link SelectorProvider} which is returned by {@link SelectorProvider#provider()}.
      */
+    // EventLoopGroup bossGroup = new NioEventLoopGroup();
+    // EventLoopGroup workerGroup = new NioEventLoopGroup();
     public NioEventLoopGroup() {
         this(0);
     }
@@ -179,6 +181,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         if (argsLength > 4) {
             tailTaskQueueFactory = (EventLoopTaskQueueFactory) args[4];
         }
+        // NioEventLoop 通过 ThreadPerTaskExecutor 创建一个 FastThreadLocalThread，然后通过一个成员变量来指向这个线程
         return new NioEventLoop(this, executor, selectorProvider,
                 selectStrategyFactory.newSelectStrategy(),
                 rejectedExecutionHandler, taskQueueFactory, tailTaskQueueFactory);

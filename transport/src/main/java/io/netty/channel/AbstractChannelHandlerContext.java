@@ -855,6 +855,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelFuture write(final Object msg, final ChannelPromise promise) {
+        // case 2: 非当前 Reactor 线程调用 Channel 的各类方法，如：
+        // 在业务线程里执行 channel.write(...); 最终会调用到这里
         write(msg, false, promise);
 
         return promise;
@@ -970,7 +972,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
                 next.invokeWrite(m, promise);
             }
         } else {
+            // 外部线程调用 write 方法时，进入此分支
             final WriteTask task = WriteTask.newInstance(next, m, promise, flush);
+            // 调用 safeExecute 方法来执行
             if (!safeExecute(executor, task, promise, m, !flush)) {
                 // We failed to submit the WriteTask. We need to cancel it so we decrement the pending bytes
                 // and put it back in the Recycler for re-use later.
@@ -1164,6 +1168,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             if (lazy && executor instanceof AbstractEventExecutor) {
                 ((AbstractEventExecutor) executor).lazyExecute(runnable);
             } else {
+                // 这里进入 case 1
+                // io.netty.util.concurrent.SingleThreadEventExecutor.execute(java.lang.Runnable)
                 executor.execute(runnable);
             }
             return true;
