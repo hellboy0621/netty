@@ -37,6 +37,7 @@ public class DefaultThreadFactory implements ThreadFactory {
     protected final ThreadGroup threadGroup;
 
     public DefaultThreadFactory(Class<?> poolType) {
+        // poolType 就是 NioEventLoopGroup
         this(poolType, false, Thread.NORM_PRIORITY);
     }
 
@@ -61,6 +62,7 @@ public class DefaultThreadFactory implements ThreadFactory {
     }
 
     public DefaultThreadFactory(Class<?> poolType, boolean daemon, int priority) {
+        // nioEventLoopGroup
         this(toPoolName(poolType), daemon, priority);
     }
 
@@ -68,6 +70,7 @@ public class DefaultThreadFactory implements ThreadFactory {
         ObjectUtil.checkNotNull(poolType, "poolType");
 
         String poolName = StringUtil.simpleClassName(poolType);
+        // NioEventLoopGroup
         switch (poolName.length()) {
             case 0:
                 return "unknown";
@@ -75,6 +78,7 @@ public class DefaultThreadFactory implements ThreadFactory {
                 return poolName.toLowerCase(Locale.US);
             default:
                 if (Character.isUpperCase(poolName.charAt(0)) && Character.isLowerCase(poolName.charAt(1))) {
+                    // nioEventLoopGroup
                     return Character.toLowerCase(poolName.charAt(0)) + poolName.substring(1);
                 } else {
                     return poolName;
@@ -90,6 +94,7 @@ public class DefaultThreadFactory implements ThreadFactory {
                     "priority: " + priority + " (expected: Thread.MIN_PRIORITY <= priority <= Thread.MAX_PRIORITY)");
         }
 
+        // 线程名的前缀，最终格式：nioEventLoopGroup-0-
         prefix = poolName + '-' + poolId.incrementAndGet() + '-';
         this.daemon = daemon;
         this.priority = priority;
@@ -102,6 +107,8 @@ public class DefaultThreadFactory implements ThreadFactory {
 
     @Override
     public Thread newThread(Runnable r) {
+        // nioEventLoopGroup-0-0
+        // 生成 Netty 优化后的 FastThreadLocalThread
         Thread t = newThread(FastThreadLocalRunnable.wrap(r), prefix + nextId.incrementAndGet());
         try {
             if (t.isDaemon() != daemon) {
