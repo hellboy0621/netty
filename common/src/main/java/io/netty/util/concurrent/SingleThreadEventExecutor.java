@@ -561,7 +561,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     @Override
     public boolean inEventLoop(Thread thread) {
         // 传入当前线程 main，this.thread 还未赋值，为 null，所以启动时返回 false
-        // 后面在创建线程后，会将线程实体保存到 this.thread 中，io.netty.util.concurrent.SingleThreadEventExecutor.doStartThread 1000行 thread = Thread.currentThread();
+        // 后面在创建线程后，会将线程实体保存到 this.thread 中，
+        // io.netty.util.concurrent.SingleThreadEventExecutor.doStartThread 1000行 thread = Thread.currentThread();
         return thread == this.thread;
     }
 
