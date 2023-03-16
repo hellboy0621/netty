@@ -384,6 +384,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 // 拿到前面创建的 JDK 的 channel，调用 register 注册方法
                 // 将 this AbstractNioChannel 对象当做 attachment 绑定到 JDK 的 Selector 上；
                 // 后续从 Selector 拿到对应的事件之后，就可以把 Netty 领域的 Channel 拿出来；
+                // 轮询注册机制，本质上是将 AbstractNioChannel 内部的 SelectableChannel ch 对象注册到 Selector 对象上，
+                // 并且将 AbstractNioChannel 作为 SelectableChannel 对象的一个 attachment 附属上
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
