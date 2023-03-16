@@ -290,6 +290,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
             if (!taskQueue.offer(scheduledTask)) {
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
+                // 当 taskQueue offer 失败时，需要把从 scheduledTaskQueue 里取出来的任务重新添加回去
                 scheduledTaskQueue.add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
             }
@@ -458,6 +459,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
     protected boolean runAllTasks(long timeoutNanos) {
+        // 1. 转移定时任务至 MPSC Queue
         fetchFromScheduledTaskQueue();
         Runnable task = pollTask();
         if (task == null) {
@@ -465,14 +467,20 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             return false;
         }
 
+        // 2. 计算本轮任务执行的截止时间
         final long deadline = timeoutNanos > 0 ? getCurrentTimeNanos() + timeoutNanos : 0;
         long runTasks = 0;
         long lastExecutionTime;
+        // 3. 执行任务
         for (;;) {
+            // 不抛异常，执行任务
             safeExecute(task);
 
+            // 累计当前已执行任务
             runTasks ++;
 
+            // 每隔 64 次，计算当前时间是否已过截止时间
+            // Netty 很多性能优化，用的都是 批量策略
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
             if ((runTasks & 0x3F) == 0) {
@@ -482,6 +490,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 }
             }
 
+            // 判断本轮任务是否执行完毕
             task = pollTask();
             if (task == null) {
                 lastExecutionTime = getCurrentTimeNanos();
@@ -817,6 +826,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         return isTerminated();
     }
 
+    /**
+     * case 1: 用户自定义普通任务
+     * ctx.channel().eventloop().execute(() -> {
+     *     // ...
+     * });
+     * 最终会调用到这里
+     */
     @Override
     public void execute(Runnable task) {
         execute0(task);
@@ -861,7 +877,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
         }
 
+        // addTaskWakesUp 为 false
+        // 只要不是懒加载，immediate 就是 true
         if (!addTaskWakesUp && immediate) {
+            // 唤醒 selector.select()
             wakeup(inEventLoop);
         }
     }
@@ -1007,6 +1026,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 updateLastExecutionTime();
                 try {
                     // Netty Reactor 核心所在
+                    // Netty NioEventLoop 执行流程入口 io.netty.channel.nio.NioEventLoop.run
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

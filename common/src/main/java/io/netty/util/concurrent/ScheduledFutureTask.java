@@ -122,12 +122,14 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         }
 
         ScheduledFutureTask<?> that = (ScheduledFutureTask<?>) o;
+        // 先比较任务的截止时间
         long d = deadlineNanos() - that.deadlineNanos();
         if (d < 0) {
             return -1;
         } else if (d > 0) {
             return 1;
         } else if (id < that.id) {
+            // 在截止时间相同的情况下，再比较 id
             return -1;
         } else {
             assert id != that.id;
@@ -148,6 +150,7 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
                 }
                 return;
             }
+            // 对应 schedule 方法，表示一次性任务
             if (periodNanos == 0) {
                 if (setUncancellableInternal()) {
                     V result = runTask();
@@ -159,8 +162,10 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
                     runTask();
                     if (!executor().isShutdown()) {
                         if (periodNanos > 0) {
+                            // 对应 scheduleAtFixedRate 方法，表示以固定速度执行某个任务，和任务的持续时间无关
                             deadlineNanos += periodNanos;
                         } else {
+                            // 对应 scheduleWithFixedDelay 方法，表示以固定的延时执行任务；每次任务执行完毕后，间隔多长时间之后再次执行
                             deadlineNanos = scheduledExecutor().getCurrentTimeNanos() - periodNanos;
                         }
                         if (!isCancelled()) {
